@@ -1,10 +1,37 @@
-from typing import Any
+import ollama
+
 
 class LLMService:
-    """Placeholder LLM wrapper for generating answers."""
-    def __init__(self, model_name: str = "gpt-4o-mini"):
-        self.model_name = model_name
 
-    def generate(self, prompt: str) -> str:
-        # Integrate with OpenAI or other LLM providers
-        return ""
+    def generate_answer(self, context: str, question: str):
+
+        prompt = f"""
+You are an AI assistant.
+
+Answer ONLY using the given context.
+
+If the answer is not present in the context,
+reply with:
+
+"I couldn't find this information in the uploaded PDF."
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer:
+"""
+
+        response = ollama.chat(
+            model="llama3.2",
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+
+        return response["message"]["content"]
