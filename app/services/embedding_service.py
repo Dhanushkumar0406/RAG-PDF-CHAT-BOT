@@ -1,10 +1,14 @@
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 class EmbeddingService:
-    """
-    Responsible for preparing text for embeddings.
-    """
+
+    def __init__(self):
+
+        self.embedding_model = HuggingFaceEmbeddings(
+            model_name="BAAI/bge-small-en-v1.5"
+        )
 
     def split_text(self, text: str):
 
@@ -14,6 +18,8 @@ class EmbeddingService:
             length_function=len
         )
 
-        chunks = splitter.split_text(text)
+        return splitter.split_text(text)
 
-        return chunks
+    def get_embedding_model(self):
+
+        return self.embedding_model

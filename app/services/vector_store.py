@@ -1,13 +1,39 @@
-from typing import List, Dict, Any
+from langchain_community.vectorstores import FAISS
 
-class VectorStore:
-    """Minimal in-memory vector store placeholder."""
-    def __init__(self):
-        self._store: List[Dict[str, Any]] = []
 
-    def add(self, vector: List[float], metadata: Dict[str, Any]):
-        self._store.append({"vector": vector, "metadata": metadata})
+class VectorStoreService:
 
-    def search(self, vector: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
-        # Return nearest neighbors (stub)
-        return self._store[:top_k]
+    def create_vector_store(
+        self,
+        chunks,
+        embedding_model
+    ):
+
+        vector_store = FAISS.from_texts(
+            texts=chunks,
+            embedding=embedding_model
+        )
+
+        return vector_store
+
+    def save_vector_store(
+        self,
+        vector_store,
+        save_path
+    ):
+
+        vector_store.save_local(save_path)
+
+    def load_vector_store(
+        self,
+        save_path,
+        embedding_model
+    ):
+
+        vector_store = FAISS.load_local(
+            save_path,
+            embedding_model,
+            allow_dangerous_deserialization=True
+        )
+
+        return vector_store
