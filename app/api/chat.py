@@ -1,8 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from app.models.request_model import ChatRequest
-from app.models.response_model import ChatResponse
-from app.services.rag_pipeline import RAGPipeline
+from ..models.request_model import ChatRequest
+from ..models.response_model import ChatResponse
+from ..services.rag_pipeline import RAGPipeline
 
 router = APIRouter()
 
@@ -17,9 +17,16 @@ async def chat(
     request: ChatRequest
 ):
 
-    answer = pipeline.ask(
-        request.question
-    )
+    question = request.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Please enter a question.")
+
+    try:
+        answer = pipeline.ask(question)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail="Upload a PDF before asking a question.") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail=f"Unable to answer right now: {exc}") from exc
 
     return ChatResponse(
         answer=answer

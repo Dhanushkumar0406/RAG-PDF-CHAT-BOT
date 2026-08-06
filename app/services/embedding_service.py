@@ -6,9 +6,15 @@ class EmbeddingService:
 
     def __init__(self):
 
-        self.embedding_model = HuggingFaceEmbeddings(
-            model_name="BAAI/bge-small-en-v1.5"
-        )
+        try:
+            self.embedding_model = HuggingFaceEmbeddings(
+                model_name="BAAI/bge-small-en-v1.5"
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                "The embedding model could not be loaded. Check your internet connection "
+                "and SSL certificates, then retry the upload."
+            ) from exc
 
     def split_text(self, text: str):
 

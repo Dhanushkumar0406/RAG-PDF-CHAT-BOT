@@ -1,122 +1,52 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+export default function App() {
+  const [file, setFile] = useState(null)
+  const [question, setQuestion] = useState('')
+  const [messages, setMessages] = useState([])
+  const [status, setStatus] = useState('Upload a PDF to begin.')
+  const [busy, setBusy] = useState(false)
 
-      <div className="ticks"></div>
+  const readError = async (response) => {
+    const body = await response.json().catch(() => ({}))
+    return body.detail || body.message || 'Something went wrong. Please try again.'
+  }
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+  const upload = async (event) => {
+    event.preventDefault()
+    if (!file) return setStatus('Choose a PDF file first.')
+    setBusy(true); setStatus('Indexing your PDF…')
+    const data = new FormData(); data.append('file', file)
+    try {
+      const response = await fetch(`${API_URL}/upload`, { method: 'POST', body: data })
+      if (!response.ok) throw new Error(await readError(response))
+      const result = await response.json()
+      setStatus(`${result.filename} is ready (${result.chunks} sections indexed).`)
+      setMessages([])
+    } catch (error) { setStatus(error.message) } finally { setBusy(false) }
+  }
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+  const ask = async (event) => {
+    event.preventDefault()
+    const text = question.trim()
+    if (!text || busy) return
+    setQuestion(''); setMessages((items) => [...items, { role: 'You', text }]); setBusy(true)
+    try {
+      const response = await fetch(`${API_URL}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text }) })
+      if (!response.ok) throw new Error(await readError(response))
+      const result = await response.json()
+      setMessages((items) => [...items, { role: 'DocMind', text: result.answer }])
+    } catch (error) { setMessages((items) => [...items, { role: 'DocMind', text: error.message, error: true }]) } finally { setBusy(false) }
+  }
+
+  return <main className="app"><section className="card">
+    <header><span className="mark">D</span><div><h1>DocMind AI</h1><p>Chat with the information in your PDF.</p></div></header>
+    <form className="upload" onSubmit={upload}><input aria-label="Choose PDF" type="file" accept="application/pdf,.pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} /><button disabled={busy}>{busy ? 'Working…' : 'Upload & index'}</button></form>
+    <p className="status" aria-live="polite">{status}</p>
+    <div className="chat" aria-live="polite">{messages.length ? messages.map((message, index) => <article className={`message ${message.error ? 'error' : ''}`} key={index}><strong>{message.role}</strong><p>{message.text}</p></article>) : <p className="empty">Your answers will appear here after you upload a document.</p>}</div>
+    <form className="ask" onSubmit={ask}><input value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask a question about the PDF…" disabled={busy} /><button disabled={busy}>Send</button></form>
+  </section></main>
 }
-
-export default App

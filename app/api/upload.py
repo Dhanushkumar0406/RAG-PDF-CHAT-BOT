@@ -1,15 +1,16 @@
 from pathlib import Path
 
-from fastapi import APIRouter, File, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.services.pdf_service import PDFService
-from app.services.embedding_service import EmbeddingService
-from app.services.rag_pipeline import RAGPipeline
+from ..services.pdf_service import PDFService
+from ..services.embedding_service import EmbeddingService
+from ..services.rag_pipeline import RAGPipeline
 
 router = APIRouter()
 
 # Folder where uploaded PDFs will be stored
-UPLOAD_FOLDER = Path("app/uploads")
+APP_FOLDER = Path(__file__).resolve().parents[1]
+UPLOAD_FOLDER = APP_FOLDER / "uploads"
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 
@@ -19,23 +20,26 @@ async def upload_pdf(file: UploadFile = File(...)):
     Upload a PDF file, save it locally, and index it for the RAG pipeline.
     """
 
-    if file.content_type != "application/pdf":
-        return {
-            "success": False,
-            "message": "Only PDF files are allowed."
-        }
+    if file.content_type != "application/pdf" and not (file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
 
-    file_path = UPLOAD_FOLDER / file.filename
+    filename = Path(file.filename or "document.pdf").name
+    file_path = UPLOAD_FOLDER / filename
 
     with open(file_path, "wb") as pdf_file:
         pdf_file.write(await file.read())
 
-    pipeline = RAGPipeline()
-    pipeline.process_pdf(file_path)
+    try:
+        pipeline = RAGPipeline()
+        chunk_count = pipeline.process_pdf(file_path)
+    except Exception as exc:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=f"Unable to index this PDF: {exc}") from exc
 
     return {
         "success": True,
-        "filename": file.filename,
+        "filename": filename,
+        "chunks": chunk_count,
         "message": "PDF uploaded and indexed successfully."
     }
 
